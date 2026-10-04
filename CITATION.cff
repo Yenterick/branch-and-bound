@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+title: Branch and Bound
+message: "If you use this software, please cite it using the metadata below."
+type: software
+
+authors:
+  - family-names: Martínez González
+    given-names: Juan David
+
+  - family-names: Salazar Velez
+    given-names: Tomas
+
+version: 1.0.0
+date-released: 2026-10-09
+
+license: MIT
+repository-code: https://github.com/Yenterick/branch-and-bound
