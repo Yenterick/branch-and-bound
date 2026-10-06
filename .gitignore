@@ -1,0 +1,4 @@
+__pycache__
+/src/core/target/*.*
+/src/target/*
+!/src/target/.gitkeep
