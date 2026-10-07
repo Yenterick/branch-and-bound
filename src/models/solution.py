@@ -1,21 +1,28 @@
 from ctypes import *
 
+# Custom imports
+from models.tree_node import TreeNodePtr
+
 """
 typedef struct Solution {
-    int* route;
-    double cost;
-    unsigned long long explored;
-    int is_optimal;
+    double* x;
+    double z;
+    int status;
+    TreeNode* tree;
+    double* tree_values;
+    int tree_size;
 } Solution;
 """
 
 
 class Solution(Structure):
     _fields_ = [
-        ("route", POINTER(c_int)),
-        ("cost", c_double),
-        ("explored", c_ulonglong),
-        ("is_optimal", c_int),
+        ("x", POINTER(c_double)),
+        ("z", c_double),
+        ("status", c_int),
+        ("tree", TreeNodePtr),
+        ("tree_values", POINTER(c_double)),
+        ("tree_size", c_int),
     ]
 
 

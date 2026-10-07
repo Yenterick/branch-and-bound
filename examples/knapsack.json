@@ -1,0 +1,11 @@
+{
+    "objective": { "sense": "max", "coefficients": [16, 22, 12, 8] },
+    "variables": ["item1", "item2", "item3", "item4"],
+    "constraints": [
+        { "coefficients": [5, 7, 4, 3], "sign": "<=", "rhs": 14 },
+        { "coefficients": [1, 0, 0, 0], "sign": "<=", "rhs": 1 },
+        { "coefficients": [0, 1, 0, 0], "sign": "<=", "rhs": 1 },
+        { "coefficients": [0, 0, 1, 0], "sign": "<=", "rhs": 1 },
+        { "coefficients": [0, 0, 0, 1], "sign": "<=", "rhs": 1 }
+    ]
+}

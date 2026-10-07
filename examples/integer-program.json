@@ -1,0 +1,8 @@
+{
+    "objective": { "sense": "max", "coefficients": [5, 4] },
+    "variables": ["x1", "x2"],
+    "constraints": [
+        { "coefficients": [6, 4], "sign": "<=", "rhs": 24 },
+        { "coefficients": [1, 2], "sign": "<=", "rhs": 6 }
+    ]
+}

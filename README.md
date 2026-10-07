@@ -46,15 +46,25 @@ make clean
 
 #### 2. Prepare your Files
 
-Get a dataset with at least latitude and longitude in grades, if you can't find one, there's already one on the `./examples`
+The problem is passed as a `.json` file (the paths and limits are passed as flags). Every variable is considered **integer and >= 0**:
 
-```csv
-codigo-de-municipio,municipio,latitud,longitud,metros-sobre-el-nivel-del-mar
-76001,cali,3.42158,-76.5205,995
-76020,alcala,4.67429,-75.7832,1290
-76036,andalucia,4.16701,-76.1662,955
-...
+```json
+{
+    "objective": { "sense": "max", "coefficients": [5, 4] },
+    "variables": ["x1", "x2"],
+    "constraints": [
+        { "coefficients": [6, 4], "sign": "<=", "rhs": 24 },
+        { "coefficients": [1, 2], "sign": "<=", "rhs": 6 }
+    ]
+}
 ```
+
+- `sense`: `max` or `min`.
+- `coefficients`: one coefficient per variable.
+- `variables`: optional names, by default `x1, x2, ...`.
+- `sign`: `<=`, `=` or `>=`.
+
+To make a variable binary (0 or 1), like in the knapsack problem, add the constraint `x <= 1`. There are some examples on the `./examples` folder: `integer-program.json`, `minimize.json` and `knapsack.json`.
 
 #### 3. Install Python requirements
 
@@ -62,7 +72,6 @@ The requirements are on `./requirements.txt`:
 
 ```txt
 numpy==2.5.0
-pandas==3.0.3
 matplotlib==3.11.0
 ```
 
@@ -90,10 +99,12 @@ or
 python main.py -h
 ```
 
-The results (`input_map.png`, `output_map.png` and `best_route.txt`) will be generated on `./src/target` by default.
+The results will be generated on `./src/target` by default:
 
-> [!NOTE]
-> Branch and Bound is an exact algorithm, its worst case grows factorially. With ~15 nodes or less it usually proves the optimal route in a few seconds, but with bigger datasets (like the 42 municipalities of the example) it will probably reach `--max_time` first. In that case it returns the best route found so far and `best_route.txt` will show `is-optimal = False`.
+- `solution.txt`: the optimal solution and every explored subproblem.
+- `tree.png`: the Branch and Bound tree.
+- `feasible_area.png`: the feasible area with the constraints, the integer points, the branch cuts and the optimum (only with 2 variables).
+- `branches.png`: the feasible area of every subproblem (only with 2 variables).
 
 ---
 
@@ -105,21 +116,14 @@ Usage: main.py [options]
 Options:
   -h, --help            show this help message and exit
   -i INPUT, --input=INPUT
-                        input dataset to process with branch and bound
+                        input problem (.json) to solve with branch and bound
   -o OUTPUT, --output=OUTPUT
                         output path to generate the results
-  -d ID_FIELD, --id_field=ID_FIELD
-                        the name of the field with the node id in the dataset
-  -n NAME_FIELD, --name_field=NAME_FIELD
-                        the name of the field with the node name in the
-                        dataset
-  -x X_FIELD, --x_field=X_FIELD
-                        the name of the field with the x coord in the dataset
-  -y Y_FIELD, --y_field=Y_FIELD
-                        the name of the field with the y coord in the dataset
   -t MAX_TIME, --max_time=MAX_TIME
                         the max running time in seconds before returning the
-                        best route found
+                        best solution found
+  -m MAX_NODES, --max_nodes=MAX_NODES
+                        the max number of subproblems (tree nodes) to explore
 ```
 
 ---
@@ -128,45 +132,44 @@ Options:
 
 ### About Branch and Bound
 
-Branch and Bound (B&B) is an exact optimization algorithm whose key feature is the ability to find the global optimum without checking every possible solution.
-It represents the solution space as a tree, where every level fixes one more decision (in the TSP, the next city of the route), this is the *branching*.
-For every node of the tree it calculates a lower bound of the best cost reachable from there, if that bound is already worse than the best solution found, the whole branch is discarded, this is the *bounding* (or pruning).
-In this way, unlike metaheuristics like Simulated Annealing, B&B guarantees the optimal solution when it explores the whole tree, at the price of an exponential worst case.
+Branch and Bound (B&B) is an exact optimization algorithm, applied here to Integer Linear Programming: optimize a linear objective subject to linear constraints where the variables must be integers.
+First it solves the *linear relaxation* (the same problem without the integer requirement) with the Simplex method, its optimum is a corner of the feasible area and gives a bound of the best integer solution.
+If a variable of that optimum is fractional, for example x2 = 1.5, it splits (*branches*) the area in two subproblems, x2 <= 1 and x2 >= 2, removing the strip between them where there are no integer points.
+Every subproblem whose bound can't improve the best integer solution found is discarded (*pruned*), so, unlike metaheuristics like Simulated Annealing, B&B guarantees the optimal solution when it explores the whole tree.
 
 ### Algorithm Analysis
 
 ```
-PROCEDURE Branch-and-Bound(graph, max_time)
+PROCEDURE Branch-and-Bound(problem, max_time, max_nodes)
 
 Inputs: 
-• graph: A graph that contains an array of nodes an its size.
+• problem: An integer linear program (objective, constraints and sense).
 • max_time: The max running in seconds allowed.
+• max_nodes: The max number of subproblems allowed.
 
-Output: A solution that contains an array of nodes sorted in the route order, the cost of the route, the number of explored tree nodes and if it is proven optimal.
+Output: A solution that contains the best integer point, its objective value, its status and the explored tree.
 
-1. Precalculate the distance matrix, the cheapest edge leaving every node and the neighbors of every node sorted by distance.
-2. Generate an initial solution using Nearest Neighbor and save it as the best solution (upper bound).
-3. Fix the first node as the start of the route (it's a cycle, so the rotations are equivalent).
-4. Start the clock and explore the tree from the root with BRANCH(route, cost):
-    A. If the elapsed time is GREATER THAN max_time, stop the search.
-    B. If the route contains every node, close the cycle and, if its cost is LESS THAN the best cost, replace best with it.
-    C. If not, for every unvisited node, from the nearest to the farthest:
-        C.1. Calculate the lower bound: cost of the route + edge to the node + cheapest edge leaving the node and every remaining node.
-        C.2. If the lower bound is GREATER OR EQUAL THAN the best cost, prune the branch.
-        C.3. If not, add the node to the route and call BRANCH recursively, then remove it (backtracking).
-5. Return the best solution, flagged as optimal if the whole tree was explored.
+1. Define the best solution (incumbent) as empty, with value -infinity (in max sense).
+2. Start the clock and explore the tree from the root (original problem) with BRANCH(bounds):
+    A. If the elapsed time is GREATER THAN max_time OR the explored nodes are GREATER THAN max_nodes, stop the search.
+    B. Solve the linear relaxation with the bounds using the Two-Phase Simplex.
+    C. If it is infeasible, discard the node.
+    D. If its value is NOT BETTER THAN the incumbent, prune the node.
+    E. If every variable is integer, replace the incumbent with it.
+    F. If not, take the first fractional variable x = v and:
+        F.1. Call BRANCH adding the bound x <= floor(v).
+        F.2. Call BRANCH adding the bound x >= ceil(v).
+3. Return the incumbent, flagged as optimal if the whole tree was explored.
 ```
 
 ### Complexity Analysis
 
-Let n be the number of nodes in the graph.
+Let n be the number of variables and m the number of constraints.
 
-- **Precalculation**: O(n² · log n)
-- **Initial solution (Nearest Neighbor)**: O(n²)
-- **Bound evaluation**: O(1), it is updated incrementally
-- **One tree node**: O(n)
-- **Total complexity**: O(n · (n - 1)!) in the worst case, but the pruning usually explores a tiny fraction of the tree.
-- **Memory**: O(n²) for the distance matrix and O(n) for the recursion.
+- **Simplex (one relaxation)**: O(m · (n + m)) per pivot, exponential in the worst case but usually polynomial in practice.
+- **One tree node**: one Simplex execution.
+- **Total complexity**: O(2^d · Simplex), where d is the depth of the tree, exponential in the worst case (Integer Programming is NP-Hard), but the pruning usually explores a tiny fraction of the tree.
+- **Memory**: O(m · (n + m)) for the tableau and O(d · n) for the recursion.
 
 ---
 
@@ -182,6 +185,6 @@ This project is licensed under the [MIT License](./LICENSE).
 ### References
 - Kernighan, B. W., & Ritchie, D. M. (1988). *The C Programming Language*. Prentice Hall.
 - Land, A. H., & Doig, A. G. (1960). An automatic method of solving discrete programming problems. *Econometrica, 28*(3), 497–520.
-- Little, J. D. C., Murty, K. G., Sweeney, D. W., & Karel, C. (1963). An algorithm for the traveling salesman problem. *Operations Research, 11*(6), 972–989.
-- Cormen, T. H. (2013). *Algorithms Unlocked*. MIT Press.
-- Unidad Administrativa Especial de Catastro Distrital, Bogotá D.C. (2026, May 18). *Datos Geográficos De Los Municipios de Valle del Cauca* [Data Set]. Datos.gov.co. https://www.datos.gov.co/Mapas-Nacionales/Datos-Geogr-ficos-De-Los-Municipios-de-Valle-del-C/iryd-wvq5/about_data
+- Taha, H. A. (2017). *Operations Research: An Introduction* (10th ed.). Pearson.
+- Hillier, F. S., & Lieberman, G. J. (2015). *Introduction to Operations Research* (10th ed.). McGraw-Hill.
+- Bland, R. G. (1977). New finite pivoting rules for the simplex method. *Mathematics of Operations Research, 2*(2), 103–107.
