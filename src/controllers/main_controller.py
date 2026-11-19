@@ -32,7 +32,9 @@ class MainController:
 
             output_path: Path = Path(output)
             output_path.mkdir(parents=True, exist_ok=True)
-            so_file_path: Path = Path(__file__).parent.parent / "core/target/branch_and_bound.so"
+            so_file_path: Path = (
+                Path(__file__).parent.parent / "target/branch_and_bound.so"
+            )
             bnb: CDLL = CDLL(str(so_file_path))
         except Exception as e:
             Utils.error(
@@ -53,7 +55,13 @@ class MainController:
             bnb.set_objective.argtypes = [ProblemPtr, c_int, c_double]
             bnb.set_objective.restype = None
 
-            bnb.set_constraint.argtypes = [ProblemPtr, c_int, POINTER(c_double), c_int, c_double]
+            bnb.set_constraint.argtypes = [
+                ProblemPtr,
+                c_int,
+                POINTER(c_double),
+                c_int,
+                c_double,
+            ]
             bnb.set_constraint.restype = None
 
             bnb.free_problem.argtypes = [ProblemPtr]
@@ -74,9 +82,13 @@ class MainController:
                 data: Dict = json.load(input_file)
 
             sense: str = data["objective"]["sense"].lower()
-            objective: List[float] = [float(c) for c in data["objective"]["coefficients"]]
+            objective: List[float] = [
+                float(c) for c in data["objective"]["coefficients"]
+            ]
             n: int = len(objective)
-            variables: List[str] = data.get("variables", [f"x{j + 1}" for j in range(n)])
+            variables: List[str] = data.get(
+                "variables", [f"x{j + 1}" for j in range(n)]
+            )
             constraints: List[Dict] = data["constraints"]
 
             if sense not in ("max", "min"):
@@ -84,10 +96,14 @@ class MainController:
             if n == 0:
                 raise ValueError("the objective needs at least one coefficient")
             if len(variables) != n:
-                raise ValueError(f"there are {len(variables)} variable names but {n} coefficients")
+                raise ValueError(
+                    f"there are {len(variables)} variable names but {n} coefficients"
+                )
             for i, constraint in enumerate(constraints):
                 if len(constraint["coefficients"]) != n:
-                    raise ValueError(f"the constraint {i + 1} doesn't have {n} coefficients")
+                    raise ValueError(
+                        f"the constraint {i + 1} doesn't have {n} coefficients"
+                    )
                 if constraint["sign"] not in cls.SIGNS:
                     raise ValueError(
                         f"the sign of the constraint {i + 1} must be <=, = or >=, not '{constraint['sign']}'"
@@ -108,7 +124,9 @@ class MainController:
                 bnb.set_objective(pointer(problem), j, coefficient)
 
             for i, constraint in enumerate(constraints):
-                coefficients = (c_double * n)(*[float(c) for c in constraint["coefficients"]])
+                coefficients = (c_double * n)(
+                    *[float(c) for c in constraint["coefficients"]]
+                )
                 bnb.set_constraint(
                     pointer(problem),
                     i,
@@ -124,7 +142,9 @@ class MainController:
 
         # Executing the algorithm
         try:
-            Utils.log(f"Executing the algorithm (max {max_time} seconds, {max_nodes} nodes)...")
+            Utils.log(
+                f"Executing the algorithm (max {max_time} seconds, {max_nodes} nodes)..."
+            )
             solution: Solution = bnb.branch_and_bound(problem, max_time, max_nodes)
         except Exception as e:
             Utils.error(f"There was an error executing the algorithm! ({e})")
@@ -183,7 +203,9 @@ class MainController:
                     )
                     for c in constraints
                 ]
-                Plotter.draw_tree(tree, variables, best_id, os.path.join(output_path, "tree.png"))
+                Plotter.draw_tree(
+                    tree, variables, best_id, os.path.join(output_path, "tree.png")
+                )
                 Plotter.draw_feasible_region(
                     plane_constraints,
                     objective,
@@ -201,7 +223,9 @@ class MainController:
                     os.path.join(output_path, "branches.png"),
                 )
             else:
-                Plotter.draw_tree(tree, variables, best_id, os.path.join(output_path, "tree.png"))
+                Plotter.draw_tree(
+                    tree, variables, best_id, os.path.join(output_path, "tree.png")
+                )
                 Utils.warning(
                     f"The problem has {n} variables, the feasible area can only be drawn with 2."
                 )
