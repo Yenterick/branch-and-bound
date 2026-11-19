@@ -33,7 +33,7 @@ class MainController:
             output_path: Path = Path(output)
             output_path.mkdir(parents=True, exist_ok=True)
             so_file_path: Path = (
-                Path(__file__).parent.parent / "target/branch_and_bound.so"
+                Path(__file__).parent.parent / "core/target/branch_and_bound.so"
             )
             bnb: CDLL = CDLL(str(so_file_path))
         except Exception as e:
